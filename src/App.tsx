@@ -49,14 +49,6 @@ const db = getFirestore(app);
 
 // アプリIDは好きな英数字の名前でOKです（データベースの保存場所の名前になります）
 const appId = "my-last-train-dj";
-
-// --- Firebase Configuration & Initialization ---
-//const firebaseConfig = JSON.parse(__firebase_config);
-//const app = initializeApp(firebaseConfig);
-//const auth = getAuth(app);
-//const db = getFirestore(app);
-//const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
-
 // --- Audio Engine (Web Audio API) ---
 class DJAudioEngine {
   // クラスプロパティの初期化
@@ -71,7 +63,9 @@ class DJAudioEngine {
   // Style management
   styles = ["hiphop", "rock", "techno"];
   currentStyleIndex = 0;
-  styleDurationMeasures = 128;
+
+  // テスト用に短く設定 (20秒で切り替え)
+  styleDurationMeasures = 8;
 
   // Frequencies for Key of F (Hotaru no Hikari)
   notes = {
@@ -165,6 +159,10 @@ class DJAudioEngine {
     this.mode = mode;
     if (mode === "sad") {
       this.beatCount = 0;
+      // Sadモード切替時に一度AudioContextの状態を確認
+      if (this.ctx && this.ctx.state === "suspended") {
+        this.ctx.resume();
+      }
     }
   }
 
@@ -264,8 +262,11 @@ class DJAudioEngine {
       }
     } else {
       // --- SAD MODE (Slow Hotaru) ---
+      // ★修正: Padを毎回チェックして鳴らすように（1小節ごと）
       if (beatIndex % 16 === 0) this.playPad(time);
-      this.playMelodyStep(time, beatIndex, "triangle", 0.2, 0.5);
+
+      // ★修正: メロディの音量を上げ(0.2->0.35)、音色をSawtoothに変更して聞こえやすくする
+      this.playMelodyStep(time, beatIndex, "sawtooth", 0.35, 0.5, false);
     }
   }
 
@@ -285,7 +286,8 @@ class DJAudioEngine {
 
     let accumulated = 0;
     const note = this.melody.find((n) => {
-      if (Math.abs(accumulated - loopTime) < 0.01) return true;
+      // 少し判定を緩くする (0.01 -> 0.05)
+      if (Math.abs(accumulated - loopTime) < 0.05) return true;
       accumulated += n.d;
       return false;
     });
@@ -486,17 +488,20 @@ class DJAudioEngine {
 
   playPad(time) {
     if (!this.ctx) return;
-    const freqs = [174.61, 261.63, 349.23];
+    // ★修正: スマホでも聞こえるようにオクターブを上げ(F4, A4, C5)、音色をTriangleに変更
+    const freqs = [349.23, 440.0, 523.25]; // F4, A4, C5 (F Major)
     freqs.forEach((f) => {
       if (!this.ctx) return;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
-      osc.type = "sine";
+      osc.type = "triangle"; // sine -> triangle
       osc.frequency.setValueAtTime(f, time);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
+
+      // 音量を少し上げる (0.1 -> 0.15)
       gain.gain.setValueAtTime(0, time);
-      gain.gain.linearRampToValueAtTime(0.1, time + 1);
+      gain.gain.linearRampToValueAtTime(0.15, time + 1);
       gain.gain.linearRampToValueAtTime(0, time + 4);
       osc.start(time);
       osc.stop(time + 4.5);
