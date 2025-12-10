@@ -33,11 +33,29 @@ import {
 } from "lucide-react";
 
 // --- Firebase Configuration & Initialization ---
-const firebaseConfig = JSON.parse(__firebase_config);
+// ここにFirebaseコンソールからコピーしたあなたの設定を貼り付けます
+const firebaseConfig = {
+  apiKey: "AIzaSyCr7KA2S7ip_B5OunXv9QoAeEQ5vM0fTiU", // あなたのAPIキー
+  authDomain: "last-train-dj.firebaseapp.com", // あなたのプロジェクトID.firebaseapp.com
+  projectId: "last-train-dj", // あなたのプロジェクトID
+  storageBucket: "last-train-dj.firebasestorage.app",
+  messagingSenderId: "830549069964",
+  appId: "1:830549069964:web:bdf75a068fb2c147f76ba9",
+};
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+
+// アプリIDは好きな英数字の名前でOKです（データベースの保存場所の名前になります）
+const appId = "my-last-train-dj";
+
+// --- Firebase Configuration & Initialization ---
+//const firebaseConfig = JSON.parse(__firebase_config);
+//const app = initializeApp(firebaseConfig);
+//const auth = getAuth(app);
+//const db = getFirestore(app);
+//const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
 
 // --- Audio Engine (Web Audio API) ---
 class DJAudioEngine {
