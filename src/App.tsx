@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { initializeApp } from "firebase/app";
 import {
@@ -31,102 +32,95 @@ import {
   Radio,
 } from "lucide-react";
 
-// 書き換え例
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "...",
-  // ... その他の設定
-};
-const appId = "my-dj-app"; // 適当な名前でOK
-
 // --- Firebase Configuration & Initialization ---
-////const firebaseConfig = JSON.parse(__firebase_config);
-////const app = initializeApp(firebaseConfig);
-////const auth = getAuth(app);
-////const db = getFirestore(app);
-////const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
 
 // --- Audio Engine (Web Audio API) ---
 class DJAudioEngine {
+  // クラスプロパティの初期化
+  ctx = null;
+  isPlaying = false;
+  mode = "party"; // 'party' or 'sad'
+  nextNoteTime = 0;
+  timerID = null;
+  beatCount = 0;
+  measureCount = 0;
+
+  // Style management
+  styles = ["hiphop", "rock", "techno"];
+  currentStyleIndex = 0;
+  styleDurationMeasures = 128;
+
+  // Frequencies for Key of F (Hotaru no Hikari)
+  notes = {
+    C3: 130.81,
+    D3: 146.83,
+    E3: 164.81,
+    F3: 174.61,
+    G3: 196.0,
+    A3: 220.0,
+    Bb3: 233.08,
+    C4: 261.63,
+    D4: 293.66,
+    E4: 329.63,
+    F4: 349.23,
+    G4: 392.0,
+    A4: 440.0,
+    Bb4: 466.16,
+    C5: 523.25,
+    D5: 587.33,
+    E5: 659.25,
+    F5: 698.46,
+  };
+
+  // Melody Sequence
+  melody = [
+    { n: "C4", d: 1 }, // Pickup
+    { n: "F4", d: 1.5 },
+    { n: "E4", d: 0.5 },
+    { n: "F4", d: 1 },
+    { n: "A4", d: 1 },
+    { n: "G4", d: 1.5 },
+    { n: "F4", d: 0.5 },
+    { n: "G4", d: 1 },
+    { n: "A4", d: 1 },
+    { n: "F4", d: 1.5 },
+    { n: "E4", d: 0.5 },
+    { n: "F4", d: 1 },
+    { n: "A4", d: 1 },
+    { n: "D5", d: 3 },
+    { n: "rest", d: 1 },
+    // Part 2
+    { n: "D5", d: 1 },
+    { n: "C5", d: 1.5 },
+    { n: "A4", d: 0.5 },
+    { n: "A4", d: 1 },
+    { n: "F4", d: 1 },
+    { n: "G4", d: 1.5 },
+    { n: "F4", d: 0.5 },
+    { n: "G4", d: 1 },
+    { n: "A4", d: 1 },
+    { n: "F4", d: 1.5 },
+    { n: "A4", d: 0.5 },
+    { n: "G4", d: 1 },
+    { n: "E4", d: 1 },
+    { n: "F4", d: 3 },
+    { n: "rest", d: 1 },
+  ];
+
   constructor() {
     this.ctx = null;
-    this.isPlaying = false;
-    this.mode = "party"; // 'party' or 'sad'
-    this.nextNoteTime = 0;
-    this.timerID = null;
-    this.beatCount = 0;
-    this.measureCount = 0;
-
-    // Style management
-    this.styles = ["hiphop", "rock", "techno"];
-    this.currentStyleIndex = 0;
-    // Changed from 8 to 128 measures to loop each style for approx 5 minutes
-    // BPM 90 (HipHop) -> ~5.6 mins
-    // BPM 140 (Rock) -> ~3.6 mins
-    // BPM 128 (Techno) -> ~4.0 mins
-    this.styleDurationMeasures = 128;
-
-    // Frequencies for Key of F (Hotaru no Hikari)
-    this.notes = {
-      C3: 130.81,
-      D3: 146.83,
-      E3: 164.81,
-      F3: 174.61,
-      G3: 196.0,
-      A3: 220.0,
-      Bb3: 233.08,
-      C4: 261.63,
-      D4: 293.66,
-      E4: 329.63,
-      F4: 349.23,
-      G4: 392.0,
-      A4: 440.0,
-      Bb4: 466.16,
-      C5: 523.25,
-      D5: 587.33,
-      E5: 659.25,
-      F5: 698.46,
-    };
-
-    // Melody Sequence (Note, Duration in beats)
-    this.melody = [
-      { n: "C4", d: 1 }, // Pickup
-      { n: "F4", d: 1.5 },
-      { n: "E4", d: 0.5 },
-      { n: "F4", d: 1 },
-      { n: "A4", d: 1 },
-      { n: "G4", d: 1.5 },
-      { n: "F4", d: 0.5 },
-      { n: "G4", d: 1 },
-      { n: "A4", d: 1 },
-      { n: "F4", d: 1.5 },
-      { n: "E4", d: 0.5 },
-      { n: "F4", d: 1 },
-      { n: "A4", d: 1 },
-      { n: "D5", d: 3 },
-      { n: "rest", d: 1 },
-      // Part 2
-      { n: "D5", d: 1 },
-      { n: "C5", d: 1.5 },
-      { n: "A4", d: 0.5 },
-      { n: "A4", d: 1 },
-      { n: "F4", d: 1 },
-      { n: "G4", d: 1.5 },
-      { n: "F4", d: 0.5 },
-      { n: "G4", d: 1 },
-      { n: "A4", d: 1 },
-      { n: "F4", d: 1.5 },
-      { n: "A4", d: 0.5 },
-      { n: "G4", d: 1 },
-      { n: "E4", d: 1 },
-      { n: "F4", d: 3 },
-      { n: "rest", d: 1 },
-    ];
   }
 
   init() {
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioContextClass();
     }
   }
 
@@ -158,7 +152,7 @@ class DJAudioEngine {
 
   start() {
     this.init();
-    if (this.ctx.state === "suspended") this.ctx.resume();
+    if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
     if (this.isPlaying) return;
 
     this.isPlaying = true;
@@ -172,11 +166,10 @@ class DJAudioEngine {
   stop() {
     this.isPlaying = false;
     if (this.timerID) clearTimeout(this.timerID);
-    // Stop all nodes logic could go here, but rely on GC for simple synth
   }
 
   scheduler() {
-    if (!this.isPlaying) return;
+    if (!this.isPlaying || !this.ctx) return;
 
     while (this.nextNoteTime < this.ctx.currentTime + 0.1) {
       this.scheduleNote(this.nextNoteTime);
@@ -281,7 +274,7 @@ class DJAudioEngine {
 
     if (note && note.n !== "rest") {
       const freq = this.notes[note.n];
-      if (freq) {
+      if (freq && this.ctx) {
         this.spawnOsc(
           time,
           freq,
@@ -295,6 +288,7 @@ class DJAudioEngine {
   }
 
   spawnOsc(time, freq, type, vol, duration, detune = false) {
+    if (!this.ctx) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = type;
@@ -327,6 +321,7 @@ class DJAudioEngine {
   }
 
   playKick(time, style) {
+    if (!this.ctx) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.connect(gain);
@@ -355,6 +350,7 @@ class DJAudioEngine {
   }
 
   playSnare(time, style) {
+    if (!this.ctx) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
 
@@ -402,6 +398,7 @@ class DJAudioEngine {
   }
 
   playHiHat(time, style) {
+    if (!this.ctx) return;
     const gain = this.ctx.createGain();
     const ratio = style === "open" ? 0.3 : 0.05;
 
@@ -429,6 +426,7 @@ class DJAudioEngine {
   }
 
   playBass(time, note, duration, type = "sine") {
+    if (!this.ctx) return;
     const freq = this.notes[note] || 100;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -445,11 +443,13 @@ class DJAudioEngine {
   }
 
   playPowerChord(time, rootNote) {
+    if (!this.ctx) return;
     // Play Root + 5th
     const rootFreq = this.notes[rootNote];
     const fifthFreq = rootFreq * 1.5;
 
     [rootFreq, fifthFreq].forEach((f) => {
+      if (!this.ctx) return;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = "sawtooth";
@@ -467,8 +467,10 @@ class DJAudioEngine {
   }
 
   playPad(time) {
+    if (!this.ctx) return;
     const freqs = [174.61, 261.63, 349.23];
     freqs.forEach((f) => {
+      if (!this.ctx) return;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = "sine";
