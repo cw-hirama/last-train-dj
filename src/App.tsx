@@ -61,6 +61,9 @@ class DJAudioEngine {
   beatCount = 0;
   measureCount = 0;
 
+  // バックグラウンド再生維持のための無音オーディオ要素
+  silentAudio = null;
+
   // Style management
   styles = ["hiphop", "rock", "techno"];
   currentStyleIndex = 0;
@@ -127,6 +130,13 @@ class DJAudioEngine {
 
   constructor() {
     this.ctx = null;
+    // 無音のMP3データ（非常に短い）。これをループ再生することでブラウザに「音楽再生中」と認識させる
+    const silentMP3 =
+      "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAAAAAAAAAAAAACCAAAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA";
+    if (typeof Audio !== "undefined") {
+      this.silentAudio = new Audio(silentMP3);
+      this.silentAudio.loop = true;
+    }
   }
 
   init() {
@@ -176,6 +186,15 @@ class DJAudioEngine {
   start() {
     this.init();
     if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
+
+    // バックグラウンド再生対策：無音オーディオの再生開始
+    // ユーザーインタラクション（ボタンクリック）内で呼ぶ必要がある
+    if (this.silentAudio) {
+      this.silentAudio
+        .play()
+        .catch((e) => console.log("Silent audio play failed", e));
+    }
+
     if (this.isPlaying) return;
 
     this.isPlaying = true;
@@ -189,6 +208,11 @@ class DJAudioEngine {
   stop() {
     this.isPlaying = false;
     if (this.timerID) clearTimeout(this.timerID);
+
+    // 無音オーディオも停止
+    if (this.silentAudio) {
+      this.silentAudio.pause();
+    }
   }
 
   scheduler() {
@@ -196,16 +220,18 @@ class DJAudioEngine {
 
     // ★重要: タイミング補正処理
     // タブがバックグラウンドにあった場合などで時間が大きくずれたら、現在時刻に同期させる
-    if (this.nextNoteTime < this.ctx.currentTime - 0.2) {
+    // 許容範囲を少し広げる (0.2s -> 0.5s)
+    if (this.nextNoteTime < this.ctx.currentTime - 0.5) {
       this.nextNoteTime = this.ctx.currentTime;
     }
 
-    while (this.nextNoteTime < this.ctx.currentTime + 0.1) {
+    // 先読み時間を少し増やす (0.1s -> 0.2s) ことで、処理落ちへの耐性を高める
+    while (this.nextNoteTime < this.ctx.currentTime + 0.2) {
       this.scheduleNote(this.nextNoteTime);
       this.advanceNote();
     }
 
-    this.timerID = setTimeout(() => this.scheduler(), 25);
+    this.timerID = setTimeout(() => this.scheduler(), 50); // チェック間隔も少し緩める
   }
 
   advanceNote() {
@@ -581,6 +607,27 @@ export default function LastTrainDJ() {
     }, 500); // Check every 500ms
     return () => clearInterval(timer);
   }, [currentStyle]);
+
+  // --- Listen for visibility change (App Switcher/Lock Screen fix) ---
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // App returned to foreground
+        if (audioEngine.ctx && audioEngine.ctx.state === "suspended") {
+          audioEngine.ctx.resume();
+        }
+        // Force resync time if needed
+        audioEngine.nextNoteTime = audioEngine.ctx
+          ? audioEngine.ctx.currentTime + 0.1
+          : 0;
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   // --- Room Listener ---
   useEffect(() => {
