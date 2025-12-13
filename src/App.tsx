@@ -29,15 +29,15 @@ import {
   Radio,
   Lock,
   Unlock,
-  Smartphone
+  Smartphone,
 } from "lucide-react";
 
 // --- Firebase Configuration ---
 // あなたの設定をそのまま使用
 const firebaseConfig = {
-  apiKey: "AIzaSyCr7KA2S7ip_B5OunXv9QoAeEQ5vM0fTiU", 
+  apiKey: "AIzaSyCr7KA2S7ip_B5OunXv9QoAeEQ5vM0fTiU",
   authDomain: "last-train-dj.firebaseapp.com",
-  projectId: "last-train-dj", 
+  projectId: "last-train-dj",
   storageBucket: "last-train-dj.firebasestorage.app",
   messagingSenderId: "830549069964",
   appId: "1:830549069964:web:bdf75a068fb2c147f76ba9",
@@ -51,15 +51,16 @@ const appId = "my-last-train-dj";
 
 // --- Helper: Base64 Dummy Video for iOS NoSleep Hack ---
 // 1px x 1px の非常に軽いMP4動画データ
-const WEBM_TINY_BASE64 = "data:video/webm;base64,GkXfo0AgQoaBAUL3gQFC8oEEQvOBCEKCQAR3ZWJtQoeBAkKFgQIYU4BnQI0VSalmRBfX1FPM2lncd0OHl9WTEZNAwICGAGHgcFGMYGHggAAABl9CBEAAABkAACZmTmZmQ==";
-const MP4_TINY_BASE64 = "data:video/mp4;base64,AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVlAAAAG21kYXQAAAGzABAHAAABthADAowdbU9/AAAC6W1vb3YAAABsbXZoAAAAAgAAAAA6nQAAOp0AAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAIVdHJhawAAAFx0a2hkAAAADwAAAAA6nQAAOp0AAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbZWR0cwAAAB1lbHN0AAAAAAAAAAEAAAEAAAEAAAAAAAEAAAA1bWRpYQAAACBtZGhkAAAAADqdAAA6nQAAAQAAAQAAAAAAuAgAAAAAAC1oZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAABVtaW5mAAAAFHZtaGQAAAAAAQAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAABM3N0YmwAAACpc3RzZAAAAAAAAAABAAAAhWF2YzEAAAAAAAAAAQABAAAAAAAAAAAAAAAAAAAAAAEAAAEAAAEAAAAAAAAAAAAAAAgAZXZjQ29uZmlndXJhdGlvblJlY29yZAAAAAQAqvxwAAgAAQAAAAEAAAAAAAAAAAAAAgAgc3BwcwBADf8AAAAOaHBwc0EALv8AAAAACmJ1cnQAAAAAAAhtcGRhAAAAABhzdHRzAAAAAAAAAAEAAAAeAAABAAAAABhzdHNjAAAAAAAAAAEAAAABAAAAHgAAAAEAAAB4c3RzegAAAAAAAAAAAAAAHAAAABRzdGNvAAAAAAAAAAEAAADgAAAAYXVkdGEAAAAxbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcgAAAAAAAAAAAAAAAAAAAAAilGlsc3QAAAAZqW5hbQAAABFcZGF0YQAAAAEAAAAAAA==";
-
+const WEBM_TINY_BASE64 =
+  "data:video/webm;base64,GkXfo0AgQoaBAUL3gQFC8oEEQvOBCEKCQAR3ZWJtQoeBAkKFgQIYU4BnQI0VSalmRBfX1FPM2lncd0OHl9WTEZNAwICGAGHgcFGMYGHggAAABl9CBEAAABkAACZmTmZmQ==";
+const MP4_TINY_BASE64 =
+  "data:video/mp4;base64,AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVlAAAAG21kYXQAAAGzABAHAAABthADAowdbU9/AAAC6W1vb3YAAABsbXZoAAAAAgAAAAA6nQAAOp0AAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAIVdHJhawAAAFx0a2hkAAAADwAAAAA6nQAAOp0AAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbZWR0cwAAAB1lbHN0AAAAAAAAAAEAAAEAAAEAAAAAAAEAAAA1bWRpYQAAACBtZGhkAAAAADqdAAA6nQAAAQAAAQAAAAAAuAgAAAAAAC1oZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAABVtaW5mAAAAFHZtaGQAAAAAAQAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAABM3N0YmwAAACpc3RzZAAAAAAAAAABAAAAhWF2YzEAAAAAAAAAAQABAAAAAAAAAAAAAAAAAAAAAAEAAAEAAAEAAAAAAAAAAAAAAAgAZXZjQ29uZmlndXJhdGlvblJlY29yZAAAAAQAqvxwAAgAAQAAAAEAAAAAAAAAAAAAAgAgc3BwcwBADf8AAAAOaHBwc0EALv8AAAAACmJ1cnQAAAAAAAhtcGRhAAAAABhzdHRzAAAAAAAAAAEAAAAeAAABAAAAABhzdHNjAAAAAAAAAAEAAAABAAAAHgAAAAEAAAB4c3RzegAAAAAAAAAAAAAAHAAAABRzdGNvAAAAAAAAAAEAAADgAAAAYXVkdGEAAAAxbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcgAAAAAAAAAAAAAAAAAAAAAilGlsc3QAAAAZqW5hbQAAABFcZGF0YQAAAAEAAAAAAA==";
 
 // --- Audio Engine (Web Audio API) ---
 class DJAudioEngine {
   ctx = null;
   isPlaying = false;
-  mode = "party"; 
+  mode = "party";
   nextNoteTime = 0;
   timerID = null;
   beatCount = 0;
@@ -67,28 +68,70 @@ class DJAudioEngine {
   silentAudio = null;
   styles = ["hiphop", "rock", "techno"];
   currentStyleIndex = 0;
-  styleDurationMeasures = 8;
+
+  // 5分程度での切り替えに変更
+  // BPM100前後とすると、1小節約2.4秒。5分(300秒)は約125小節。
+  // キリよく128小節に設定します。
+  styleDurationMeasures = 128;
 
   notes = {
-    C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.0, A3: 220.0, Bb3: 233.08,
-    C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, A4: 440.0, Bb4: 466.16,
-    C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46,
+    C3: 130.81,
+    D3: 146.83,
+    E3: 164.81,
+    F3: 174.61,
+    G3: 196.0,
+    A3: 220.0,
+    Bb3: 233.08,
+    C4: 261.63,
+    D4: 293.66,
+    E4: 329.63,
+    F4: 349.23,
+    G4: 392.0,
+    A4: 440.0,
+    Bb4: 466.16,
+    C5: 523.25,
+    D5: 587.33,
+    E5: 659.25,
+    F5: 698.46,
   };
 
   melody = [
-    { n: "C4", d: 1 }, { n: "F4", d: 1.5 }, { n: "E4", d: 0.5 }, { n: "F4", d: 1 },
-    { n: "A4", d: 1 }, { n: "G4", d: 1.5 }, { n: "F4", d: 0.5 }, { n: "G4", d: 1 },
-    { n: "A4", d: 1 }, { n: "F4", d: 1.5 }, { n: "E4", d: 0.5 }, { n: "F4", d: 1 },
-    { n: "A4", d: 1 }, { n: "D5", d: 3 }, { n: "rest", d: 1 },
-    { n: "D5", d: 1 }, { n: "C5", d: 1.5 }, { n: "A4", d: 0.5 }, { n: "A4", d: 1 },
-    { n: "F4", d: 1 }, { n: "G4", d: 1.5 }, { n: "F4", d: 0.5 }, { n: "G4", d: 1 },
-    { n: "A4", d: 1 }, { n: "F4", d: 1.5 }, { n: "A4", d: 0.5 }, { n: "G4", d: 1 },
-    { n: "E4", d: 1 }, { n: "F4", d: 3 }, { n: "rest", d: 1 },
+    { n: "C4", d: 1 },
+    { n: "F4", d: 1.5 },
+    { n: "E4", d: 0.5 },
+    { n: "F4", d: 1 },
+    { n: "A4", d: 1 },
+    { n: "G4", d: 1.5 },
+    { n: "F4", d: 0.5 },
+    { n: "G4", d: 1 },
+    { n: "A4", d: 1 },
+    { n: "F4", d: 1.5 },
+    { n: "E4", d: 0.5 },
+    { n: "F4", d: 1 },
+    { n: "A4", d: 1 },
+    { n: "D5", d: 3 },
+    { n: "rest", d: 1 },
+    { n: "D5", d: 1 },
+    { n: "C5", d: 1.5 },
+    { n: "A4", d: 0.5 },
+    { n: "A4", d: 1 },
+    { n: "F4", d: 1 },
+    { n: "G4", d: 1.5 },
+    { n: "F4", d: 0.5 },
+    { n: "G4", d: 1 },
+    { n: "A4", d: 1 },
+    { n: "F4", d: 1.5 },
+    { n: "A4", d: 0.5 },
+    { n: "G4", d: 1 },
+    { n: "E4", d: 1 },
+    { n: "F4", d: 3 },
+    { n: "rest", d: 1 },
   ];
 
   constructor() {
     this.ctx = null;
-    const silentMP3 = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAAAAAAAAAAAAACCAAAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA";
+    const silentMP3 =
+      "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAAAAAAAAAAAAACCAAAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA";
     if (typeof Audio !== "undefined") {
       this.silentAudio = new Audio(silentMP3);
       this.silentAudio.loop = true;
@@ -97,20 +140,27 @@ class DJAudioEngine {
 
   init() {
     if (!this.ctx) {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioContextClass();
     }
   }
 
-  get currentStyle() { return this.styles[this.currentStyleIndex]; }
+  get currentStyle() {
+    return this.styles[this.currentStyleIndex];
+  }
 
   get currentBPM() {
     if (this.mode === "sad") return 60;
     switch (this.currentStyle) {
-      case "hiphop": return 90;
-      case "rock": return 140;
-      case "techno": return 128;
-      default: return 100;
+      case "hiphop":
+        return 90;
+      case "rock":
+        return 140;
+      case "techno":
+        return 128;
+      default:
+        return 100;
     }
   }
 
@@ -128,7 +178,9 @@ class DJAudioEngine {
     this.init();
     if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
     if (this.silentAudio) {
-      this.silentAudio.play().catch((e) => console.log("Silent audio play failed", e));
+      this.silentAudio
+        .play()
+        .catch((e) => console.log("Silent audio play failed", e));
     }
     if (this.isPlaying) return;
     this.isPlaying = true;
@@ -159,19 +211,23 @@ class DJAudioEngine {
 
   advanceNote() {
     const secondsPerBeat = 60.0 / this.currentBPM;
-    this.nextNoteTime += secondsPerBeat * 0.25; 
+    this.nextNoteTime += secondsPerBeat * 0.25;
     this.beatCount++;
     if (this.beatCount % 16 === 0) {
       this.measureCount++;
-      if (this.mode === "party" && this.measureCount % this.styleDurationMeasures === 0) {
-        this.currentStyleIndex = (this.currentStyleIndex + 1) % this.styles.length;
+      if (
+        this.mode === "party" &&
+        this.measureCount % this.styleDurationMeasures === 0
+      ) {
+        this.currentStyleIndex =
+          (this.currentStyleIndex + 1) % this.styles.length;
       }
     }
   }
 
   scheduleNote(time) {
     const beatIndex = this.beatCount;
-    const step = beatIndex % 16; 
+    const step = beatIndex % 16;
 
     if (this.mode === "party") {
       const style = this.currentStyle;
@@ -189,11 +245,12 @@ class DJAudioEngine {
         this.playMelodyStep(time, beatIndex, "sawtooth", 0.08, 0.3);
         if (step % 2 === 0) this.playPowerChord(time, "F3");
       } else if (style === "techno") {
-        if (step % 4 === 0) this.playKick(time, "techno"); 
+        if (step % 4 === 0) this.playKick(time, "techno");
         if (step === 4 || step === 12) this.playSnare(time, "clap");
-        if (step % 2 !== 0) this.playHiHat(time, "open"); 
-        this.playMelodyStep(time, beatIndex, "sawtooth", 0.1, 0.1, true); 
-        if (step % 2 === 0) this.playBass(time, step % 4 === 0 ? "F2" : "F3", 0.1, "sawtooth");
+        if (step % 2 !== 0) this.playHiHat(time, "open");
+        this.playMelodyStep(time, beatIndex, "sawtooth", 0.1, 0.1, true);
+        if (step % 2 === 0)
+          this.playBass(time, step % 4 === 0 ? "F2" : "F3", 0.1, "sawtooth");
       }
     } else {
       if (beatIndex % 16 === 0) this.playPad(time);
@@ -201,7 +258,14 @@ class DJAudioEngine {
     }
   }
 
-  playMelodyStep(time, sixteenthNoteCounter, type, gainVal, release, detune = false) {
+  playMelodyStep(
+    time,
+    sixteenthNoteCounter,
+    type,
+    gainVal,
+    release,
+    detune = false
+  ) {
     let currentBeat = sixteenthNoteCounter / 4;
     const totalDuration = this.melody.reduce((acc, n) => acc + n.d, 0);
     const loopTime = currentBeat % totalDuration;
@@ -214,7 +278,14 @@ class DJAudioEngine {
     if (note && note.n !== "rest") {
       const freq = this.notes[note.n];
       if (freq && this.ctx) {
-        this.spawnOsc(time, freq, type, gainVal, note.d * (60 / this.currentBPM) - 0.05, detune);
+        this.spawnOsc(
+          time,
+          freq,
+          type,
+          gainVal,
+          note.d * (60 / this.currentBPM) - 0.05,
+          detune
+        );
       }
     }
   }
@@ -246,7 +317,9 @@ class DJAudioEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
       osc.start(time);
       osc.stop(time + duration + 0.1);
-    } catch (e) { console.error("Audio Error:", e); }
+    } catch (e) {
+      console.error("Audio Error:", e);
+    }
   }
 
   playKick(time, style) {
@@ -284,7 +357,11 @@ class DJAudioEngine {
       const gain = this.ctx.createGain();
       if (style === "clap") {
         const bufferSize = this.ctx.sampleRate * 0.5;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const buffer = this.ctx.createBuffer(
+          1,
+          bufferSize,
+          this.ctx.sampleRate
+        );
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
         const noise = this.ctx.createBufferSource();
@@ -382,7 +459,7 @@ class DJAudioEngine {
   playPad(time) {
     if (!this.ctx) return;
     try {
-      const freqs = [349.23, 440.0, 523.25]; 
+      const freqs = [349.23, 440.0, 523.25];
       freqs.forEach((f) => {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
@@ -428,16 +505,16 @@ export default function LastTrainDJ() {
   // Wake Lockを有効にする関数（API + ビデオハック）
   const enableNoSleep = useCallback(async () => {
     // 1. 公式 API (Chrome/Android)
-    if ('wakeLock' in navigator) {
+    if ("wakeLock" in navigator) {
       try {
-        const lock = await navigator.wakeLock.request('screen');
+        const lock = await navigator.wakeLock.request("screen");
         setWakeLock(lock);
         setIsWakeLockActive(true);
-        lock.addEventListener('release', () => {
+        lock.addEventListener("release", () => {
           setIsWakeLockActive(false);
-          console.log('Wake Lock released');
+          console.log("Wake Lock released");
         });
-        console.log('Wake Lock active');
+        console.log("Wake Lock active");
       } catch (err) {
         console.error(`${err.name}, ${err.message}`);
       }
@@ -445,7 +522,7 @@ export default function LastTrainDJ() {
 
     // 2. iOS用 Video Hack (隠し動画を再生)
     if (videoRef.current) {
-      videoRef.current.play().catch(e => console.log("Video hack failed", e));
+      videoRef.current.play().catch((e) => console.log("Video hack failed", e));
       setIsWakeLockActive(true); // ビデオが再生できれば擬似的にActiveとする
     }
   }, []);
@@ -453,28 +530,36 @@ export default function LastTrainDJ() {
   // ページが見えなくなった時にWake Lockが外れるので、戻ってきたら再取得
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && inRoom) {
+      if (document.visibilityState === "visible" && inRoom) {
         // 再取得を試みる
         await enableNoSleep();
-        
+
         // オーディオコンテキストの復帰
         if (audioEngine.ctx && audioEngine.ctx.state === "suspended") {
           audioEngine.ctx.resume();
         }
-        audioEngine.nextNoteTime = audioEngine.ctx ? audioEngine.ctx.currentTime + 0.1 : 0;
+        audioEngine.nextNoteTime = audioEngine.ctx
+          ? audioEngine.ctx.currentTime + 0.1
+          : 0;
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [inRoom, enableNoSleep]);
-
 
   // --- Auth & Init ---
   useEffect(() => {
     const initAuth = async () => {
       if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
+        try {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } catch (e) {
+          console.error("Custom token failed, falling back to anonymous:", e);
+          // フォールバック: トークンが無効な場合は匿名ログインを試みる
+          await signInAnonymously(auth);
+        }
       } else {
         await signInAnonymously(auth);
       }
@@ -493,7 +578,7 @@ export default function LastTrainDJ() {
           setCurrentStyle(audioEngine.currentStyle);
         }
       }
-    }, 500); 
+    }, 500);
     return () => clearInterval(timer);
   }, [currentStyle]);
 
@@ -594,7 +679,7 @@ export default function LastTrainDJ() {
   const joinRoom = async () => {
     if (!roomId) return;
     setInRoom(true);
-    
+
     // 入室時にスリープ防止を有効化を試みる
     await enableNoSleep();
 
@@ -617,7 +702,7 @@ export default function LastTrainDJ() {
   const toggleDj = async () => {
     // DJ開始時にもスリープ防止を確実に有効化
     if (!isDjPlaying) {
-        await enableNoSleep();
+      await enableNoSleep();
     }
 
     const newStatus = !isDjPlaying;
@@ -676,9 +761,7 @@ export default function LastTrainDJ() {
               <Disc size={40} className="text-white animate-spin-slow" />
             </div>
             <h1 className="text-4xl font-extrabold tracking-tight">終電 DJ</h1>
-            <p className="mt-2 text-slate-400">
-              音楽が終電を教えてくれる。
-            </p>
+            <p className="mt-2 text-slate-400">音楽が終電を教えてくれる。</p>
           </div>
 
           <div className="bg-slate-800 p-6 rounded-2xl shadow-xl space-y-4 border border-slate-700">
@@ -744,12 +827,12 @@ export default function LastTrainDJ() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-yellow-900/30 p-3 rounded-lg border border-yellow-700/50">
-               <p className="text-xs text-yellow-200 flex items-center">
-                 <Smartphone size={14} className="mr-2" />
-                 スマホのスリープ防止機能が有効になります。
-               </p>
+              <p className="text-xs text-yellow-200 flex items-center">
+                <Smartphone size={14} className="mr-2" />
+                スマホのスリープ防止機能が有効になります。
+              </p>
             </div>
 
             <button
@@ -761,7 +844,7 @@ export default function LastTrainDJ() {
             </button>
           </div>
         </div>
-        
+
         {/* Hidden Video for NoSleep Hack (Initial Load) */}
         <video
           ref={videoRef}
@@ -769,7 +852,13 @@ export default function LastTrainDJ() {
           playsInline
           muted
           loop
-          style={{ position: "absolute", width: 1, height: 1, opacity: 0.01, pointerEvents: 'none' }}
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            opacity: 0.01,
+            pointerEvents: "none",
+          }}
         />
       </div>
     );
@@ -778,9 +867,17 @@ export default function LastTrainDJ() {
   const isCritical = !!leavingUser;
 
   const styleConfig = {
-    hiphop: { label: "HIP-HOP", color: "from-purple-500 to-pink-500", icon: Speaker },
+    hiphop: {
+      label: "HIP-HOP",
+      color: "from-purple-500 to-pink-500",
+      icon: Speaker,
+    },
     rock: { label: "ROCK", color: "from-red-500 to-orange-500", icon: Zap },
-    techno: { label: "TECHNO", color: "from-blue-500 to-cyan-500", icon: Radio },
+    techno: {
+      label: "TECHNO",
+      color: "from-blue-500 to-cyan-500",
+      icon: Radio,
+    },
   };
 
   const currentVisual = isCritical
@@ -800,7 +897,15 @@ export default function LastTrainDJ() {
         playsInline
         muted
         loop
-        style={{ position: "absolute", width: 1, height: 1, opacity: 0.01, pointerEvents: 'none', top: 0, left: 0 }}
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          opacity: 0.01,
+          pointerEvents: "none",
+          top: 0,
+          left: 0,
+        }}
       />
 
       {/* Header */}
@@ -810,13 +915,20 @@ export default function LastTrainDJ() {
           <span className="font-bold text-sm md:text-base">Room: {roomId}</span>
         </div>
         <div className="flex items-center gap-3">
-             <div className="flex items-center px-2 py-1 rounded bg-black/40 text-xs text-slate-400">
-                {isWakeLockActive ? <Unlock size={12} className="mr-1 text-green-400" /> : <Lock size={12} className="mr-1 text-red-400" />}
-                {isWakeLockActive ? "NoSleep ON" : "NoSleep OFF"}
-             </div>
-            <div className="text-2xl font-mono text-white font-bold leading-none">
-                {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </div>
+          <div className="flex items-center px-2 py-1 rounded bg-black/40 text-xs text-slate-400">
+            {isWakeLockActive ? (
+              <Unlock size={12} className="mr-1 text-green-400" />
+            ) : (
+              <Lock size={12} className="mr-1 text-red-400" />
+            )}
+            {isWakeLockActive ? "NoSleep ON" : "NoSleep OFF"}
+          </div>
+          <div className="text-2xl font-mono text-white font-bold leading-none">
+            {currentTime.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
         </div>
       </header>
 
