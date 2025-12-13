@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -15,12 +15,9 @@ import {
   onSnapshot,
   updateDoc,
   serverTimestamp,
-  query,
-  orderBy,
 } from "firebase/firestore";
 import {
   Disc,
-  Music,
   User as UserIcon,
   LogOut,
   Clock,
@@ -30,14 +27,17 @@ import {
   Zap,
   Speaker,
   Radio,
+  Lock,
+  Unlock,
+  Smartphone
 } from "lucide-react";
 
-// --- Firebase Configuration & Initialization ---
-// ここにFirebaseコンソールからコピーしたあなたの設定を貼り付けます
+// --- Firebase Configuration ---
+// あなたの設定をそのまま使用
 const firebaseConfig = {
-  apiKey: "AIzaSyCr7KA2S7ip_B5OunXv9QoAeEQ5vM0fTiU", // あなたのAPIキー
-  authDomain: "last-train-dj.firebaseapp.com", // あなたのプロジェクトID.firebaseapp.com
-  projectId: "last-train-dj", // あなたのプロジェクトID
+  apiKey: "AIzaSyCr7KA2S7ip_B5OunXv9QoAeEQ5vM0fTiU", 
+  authDomain: "last-train-dj.firebaseapp.com",
+  projectId: "last-train-dj", 
   storageBucket: "last-train-dj.firebasestorage.app",
   messagingSenderId: "830549069964",
   appId: "1:830549069964:web:bdf75a068fb2c147f76ba9",
@@ -47,92 +47,48 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// アプリIDは好きな英数字の名前でOKです（データベースの保存場所の名前になります）
 const appId = "my-last-train-dj";
+
+// --- Helper: Base64 Dummy Video for iOS NoSleep Hack ---
+// 1px x 1px の非常に軽いMP4動画データ
+const WEBM_TINY_BASE64 = "data:video/webm;base64,GkXfo0AgQoaBAUL3gQFC8oEEQvOBCEKCQAR3ZWJtQoeBAkKFgQIYU4BnQI0VSalmRBfX1FPM2lncd0OHl9WTEZNAwICGAGHgcFGMYGHggAAABl9CBEAAABkAACZmTmZmQ==";
+const MP4_TINY_BASE64 = "data:video/mp4;base64,AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVlAAAAG21kYXQAAAGzABAHAAABthADAowdbU9/AAAC6W1vb3YAAABsbXZoAAAAAgAAAAA6nQAAOp0AAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAIVdHJhawAAAFx0a2hkAAAADwAAAAA6nQAAOp0AAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbZWR0cwAAAB1lbHN0AAAAAAAAAAEAAAEAAAEAAAAAAAEAAAA1bWRpYQAAACBtZGhkAAAAADqdAAA6nQAAAQAAAQAAAAAAuAgAAAAAAC1oZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAABVtaW5mAAAAFHZtaGQAAAAAAQAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAABM3N0YmwAAACpc3RzZAAAAAAAAAABAAAAhWF2YzEAAAAAAAAAAQABAAAAAAAAAAAAAAAAAAAAAAEAAAEAAAEAAAAAAAAAAAAAAAgAZXZjQ29uZmlndXJhdGlvblJlY29yZAAAAAQAqvxwAAgAAQAAAAEAAAAAAAAAAAAAAgAgc3BwcwBADf8AAAAOaHBwc0EALv8AAAAACmJ1cnQAAAAAAAhtcGRhAAAAABhzdHRzAAAAAAAAAAEAAAAeAAABAAAAABhzdHNjAAAAAAAAAAEAAAABAAAAHgAAAAEAAAB4c3RzegAAAAAAAAAAAAAAHAAAABRzdGNvAAAAAAAAAAEAAADgAAAAYXVkdGEAAAAxbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcgAAAAAAAAAAAAAAAAAAAAAilGlsc3QAAAAZqW5hbQAAABFcZGF0YQAAAAEAAAAAAA==";
+
 
 // --- Audio Engine (Web Audio API) ---
 class DJAudioEngine {
-  // クラスプロパティの初期化
   ctx = null;
   isPlaying = false;
-  mode = "party"; // 'party' or 'sad'
+  mode = "party"; 
   nextNoteTime = 0;
   timerID = null;
   beatCount = 0;
   measureCount = 0;
-
-  // バックグラウンド再生維持のための無音オーディオ要素
   silentAudio = null;
-
-  // Style management
   styles = ["hiphop", "rock", "techno"];
   currentStyleIndex = 0;
-
-  // テスト用に短く設定 (20秒で切り替え)
   styleDurationMeasures = 8;
 
-  // Frequencies for Key of F (Hotaru no Hikari)
   notes = {
-    C3: 130.81,
-    D3: 146.83,
-    E3: 164.81,
-    F3: 174.61,
-    G3: 196.0,
-    A3: 220.0,
-    Bb3: 233.08,
-    C4: 261.63,
-    D4: 293.66,
-    E4: 329.63,
-    F4: 349.23,
-    G4: 392.0,
-    A4: 440.0,
-    Bb4: 466.16,
-    C5: 523.25,
-    D5: 587.33,
-    E5: 659.25,
-    F5: 698.46,
+    C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.0, A3: 220.0, Bb3: 233.08,
+    C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, A4: 440.0, Bb4: 466.16,
+    C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46,
   };
 
-  // Melody Sequence
   melody = [
-    { n: "C4", d: 1 }, // Pickup
-    { n: "F4", d: 1.5 },
-    { n: "E4", d: 0.5 },
-    { n: "F4", d: 1 },
-    { n: "A4", d: 1 },
-    { n: "G4", d: 1.5 },
-    { n: "F4", d: 0.5 },
-    { n: "G4", d: 1 },
-    { n: "A4", d: 1 },
-    { n: "F4", d: 1.5 },
-    { n: "E4", d: 0.5 },
-    { n: "F4", d: 1 },
-    { n: "A4", d: 1 },
-    { n: "D5", d: 3 },
-    { n: "rest", d: 1 },
-    // Part 2
-    { n: "D5", d: 1 },
-    { n: "C5", d: 1.5 },
-    { n: "A4", d: 0.5 },
-    { n: "A4", d: 1 },
-    { n: "F4", d: 1 },
-    { n: "G4", d: 1.5 },
-    { n: "F4", d: 0.5 },
-    { n: "G4", d: 1 },
-    { n: "A4", d: 1 },
-    { n: "F4", d: 1.5 },
-    { n: "A4", d: 0.5 },
-    { n: "G4", d: 1 },
-    { n: "E4", d: 1 },
-    { n: "F4", d: 3 },
-    { n: "rest", d: 1 },
+    { n: "C4", d: 1 }, { n: "F4", d: 1.5 }, { n: "E4", d: 0.5 }, { n: "F4", d: 1 },
+    { n: "A4", d: 1 }, { n: "G4", d: 1.5 }, { n: "F4", d: 0.5 }, { n: "G4", d: 1 },
+    { n: "A4", d: 1 }, { n: "F4", d: 1.5 }, { n: "E4", d: 0.5 }, { n: "F4", d: 1 },
+    { n: "A4", d: 1 }, { n: "D5", d: 3 }, { n: "rest", d: 1 },
+    { n: "D5", d: 1 }, { n: "C5", d: 1.5 }, { n: "A4", d: 0.5 }, { n: "A4", d: 1 },
+    { n: "F4", d: 1 }, { n: "G4", d: 1.5 }, { n: "F4", d: 0.5 }, { n: "G4", d: 1 },
+    { n: "A4", d: 1 }, { n: "F4", d: 1.5 }, { n: "A4", d: 0.5 }, { n: "G4", d: 1 },
+    { n: "E4", d: 1 }, { n: "F4", d: 3 }, { n: "rest", d: 1 },
   ];
 
   constructor() {
     this.ctx = null;
-    // 無音のMP3データ（非常に短い）。これをループ再生することでブラウザに「音楽再生中」と認識させる
-    const silentMP3 =
-      "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAAAAAAAAAAAAACCAAAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA";
+    const silentMP3 = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAAAAAAAAAAAAACCAAAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA//OEMAAAAAAAB9AAAAAAAAAAIOFMx54AAfmAAAAAAAAAAAA";
     if (typeof Audio !== "undefined") {
       this.silentAudio = new Audio(silentMP3);
       this.silentAudio.loop = true;
@@ -141,62 +97,40 @@ class DJAudioEngine {
 
   init() {
     if (!this.ctx) {
-      const AudioContextClass =
-        window.AudioContext || window.webkitAudioContext;
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioContextClass();
     }
   }
 
-  get currentStyle() {
-    return this.styles[this.currentStyleIndex];
-  }
+  get currentStyle() { return this.styles[this.currentStyleIndex]; }
 
   get currentBPM() {
     if (this.mode === "sad") return 60;
     switch (this.currentStyle) {
-      case "hiphop":
-        return 90;
-      case "rock":
-        return 140;
-      case "techno":
-        return 128;
-      default:
-        return 100;
+      case "hiphop": return 90;
+      case "rock": return 140;
+      case "techno": return 128;
+      default: return 100;
     }
   }
 
   setMode(mode) {
     if (this.mode === mode) return;
     this.mode = mode;
-
-    // モード切替時にタイミングをリセットして音切れを防ぐ
     if (this.ctx) {
-      if (this.ctx.state === "suspended") {
-        this.ctx.resume();
-      }
-      // 次のノートを「今」に設定し直す
+      if (this.ctx.state === "suspended") this.ctx.resume();
       this.nextNoteTime = this.ctx.currentTime + 0.1;
     }
-
-    if (mode === "sad") {
-      this.beatCount = 0;
-    }
+    if (mode === "sad") this.beatCount = 0;
   }
 
   start() {
     this.init();
     if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
-
-    // バックグラウンド再生対策：無音オーディオの再生開始
-    // ユーザーインタラクション（ボタンクリック）内で呼ぶ必要がある
     if (this.silentAudio) {
-      this.silentAudio
-        .play()
-        .catch((e) => console.log("Silent audio play failed", e));
+      this.silentAudio.play().catch((e) => console.log("Silent audio play failed", e));
     }
-
     if (this.isPlaying) return;
-
     this.isPlaying = true;
     this.nextNoteTime = this.ctx.currentTime + 0.1;
     this.beatCount = 0;
@@ -208,140 +142,79 @@ class DJAudioEngine {
   stop() {
     this.isPlaying = false;
     if (this.timerID) clearTimeout(this.timerID);
-
-    // 無音オーディオも停止
-    if (this.silentAudio) {
-      this.silentAudio.pause();
-    }
+    if (this.silentAudio) this.silentAudio.pause();
   }
 
   scheduler() {
     if (!this.isPlaying || !this.ctx) return;
-
-    // ★重要: タイミング補正処理
-    // タブがバックグラウンドにあった場合などで時間が大きくずれたら、現在時刻に同期させる
-    // 許容範囲を少し広げる (0.2s -> 0.5s)
     if (this.nextNoteTime < this.ctx.currentTime - 0.5) {
       this.nextNoteTime = this.ctx.currentTime;
     }
-
-    // 先読み時間を少し増やす (0.1s -> 0.2s) ことで、処理落ちへの耐性を高める
     while (this.nextNoteTime < this.ctx.currentTime + 0.2) {
       this.scheduleNote(this.nextNoteTime);
       this.advanceNote();
     }
-
-    this.timerID = setTimeout(() => this.scheduler(), 50); // チェック間隔も少し緩める
+    this.timerID = setTimeout(() => this.scheduler(), 50);
   }
 
   advanceNote() {
     const secondsPerBeat = 60.0 / this.currentBPM;
-    this.nextNoteTime += secondsPerBeat * 0.25; // 16th notes
+    this.nextNoteTime += secondsPerBeat * 0.25; 
     this.beatCount++;
-
-    // Update measure count (assuming 4/4 time, 16 steps per measure)
     if (this.beatCount % 16 === 0) {
       this.measureCount++;
-      // Switch style periodically in party mode
-      if (
-        this.mode === "party" &&
-        this.measureCount % this.styleDurationMeasures === 0
-      ) {
-        this.currentStyleIndex =
-          (this.currentStyleIndex + 1) % this.styles.length;
+      if (this.mode === "party" && this.measureCount % this.styleDurationMeasures === 0) {
+        this.currentStyleIndex = (this.currentStyleIndex + 1) % this.styles.length;
       }
     }
   }
 
   scheduleNote(time) {
     const beatIndex = this.beatCount;
-    const step = beatIndex % 16; // 0-15
+    const step = beatIndex % 16; 
 
     if (this.mode === "party") {
-      // --- PARTY MODES ---
       const style = this.currentStyle;
-
       if (style === "hiphop") {
-        // --- Hip Hop: Swing feel, Boom Bap ---
         if (step === 0 || step === 10) this.playKick(time, "heavy");
         if (step === 4 || step === 12) this.playSnare(time, "snap");
         if (step % 2 === 0) this.playHiHat(time, "closed");
-
-        // Melody: Square wave, Gameboy ish
         this.playMelodyStep(time, beatIndex, "square", 0.1, 0.1);
-
-        // Bass
         if (step === 0) this.playBass(time, "F2", 0.5);
         if (step === 10) this.playBass(time, "C2", 0.5);
       } else if (style === "rock") {
-        // --- Rock: Driving 8th notes, Distortion ---
         if (step === 0 || step === 8) this.playKick(time, "punchy");
         if (step === 4 || step === 12) this.playSnare(time, "acoustic");
         if (step % 2 === 0) this.playHiHat(time, "open");
-
-        // Melody: Sawtooth (Distortion Guitar ish)
         this.playMelodyStep(time, beatIndex, "sawtooth", 0.08, 0.3);
-
-        // Power Chord pulsing (Root + 5th) on 8th notes
-        if (step % 2 === 0) {
-          this.playPowerChord(time, "F3");
-        }
+        if (step % 2 === 0) this.playPowerChord(time, "F3");
       } else if (style === "techno") {
-        // --- Techno: 4-on-the-floor, Trance ---
-        if (step % 4 === 0) this.playKick(time, "techno"); // 4 on floor
+        if (step % 4 === 0) this.playKick(time, "techno"); 
         if (step === 4 || step === 12) this.playSnare(time, "clap");
-        if (step % 2 !== 0) this.playHiHat(time, "open"); // Off-beat hat
-
-        // Melody: Super Saw / Trance lead (Detuned saws)
-        this.playMelodyStep(time, beatIndex, "sawtooth", 0.1, 0.1, true); // true for detune
-
-        // Arp bass
-        if (step % 2 === 0)
-          this.playBass(time, step % 4 === 0 ? "F2" : "F3", 0.1, "sawtooth");
+        if (step % 2 !== 0) this.playHiHat(time, "open"); 
+        this.playMelodyStep(time, beatIndex, "sawtooth", 0.1, 0.1, true); 
+        if (step % 2 === 0) this.playBass(time, step % 4 === 0 ? "F2" : "F3", 0.1, "sawtooth");
       }
     } else {
-      // --- SAD MODE (Slow Hotaru) ---
-      // Padを毎回チェックして鳴らす（1小節ごと）
       if (beatIndex % 16 === 0) this.playPad(time);
-
-      // メロディの音量を確保
       this.playMelodyStep(time, beatIndex, "sawtooth", 0.35, 0.5, false);
     }
   }
 
-  // --- Synth Methods ---
-
-  playMelodyStep(
-    time,
-    sixteenthNoteCounter,
-    type,
-    gainVal,
-    release,
-    detune = false
-  ) {
+  playMelodyStep(time, sixteenthNoteCounter, type, gainVal, release, detune = false) {
     let currentBeat = sixteenthNoteCounter / 4;
     const totalDuration = this.melody.reduce((acc, n) => acc + n.d, 0);
     const loopTime = currentBeat % totalDuration;
-
     let accumulated = 0;
     const note = this.melody.find((n) => {
-      // 少し判定を緩くする
       if (Math.abs(accumulated - loopTime) < 0.05) return true;
       accumulated += n.d;
       return false;
     });
-
     if (note && note.n !== "rest") {
       const freq = this.notes[note.n];
       if (freq && this.ctx) {
-        this.spawnOsc(
-          time,
-          freq,
-          type,
-          gainVal,
-          note.d * (60 / this.currentBPM) - 0.05,
-          detune
-        );
+        this.spawnOsc(time, freq, type, gainVal, note.d * (60 / this.currentBPM) - 0.05, detune);
       }
     }
   }
@@ -353,7 +226,6 @@ class DJAudioEngine {
       const gain = this.ctx.createGain();
       osc.type = type;
       osc.frequency.setValueAtTime(freq, time);
-
       if (detune) {
         const osc2 = this.ctx.createOscillator();
         const gain2 = this.ctx.createGain();
@@ -367,19 +239,14 @@ class DJAudioEngine {
         osc2.start(time);
         osc2.stop(time + duration + 0.1);
       }
-
       osc.connect(gain);
       gain.connect(this.ctx.destination);
-
       gain.gain.setValueAtTime(0, time);
       gain.gain.linearRampToValueAtTime(vol, time + 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-
       osc.start(time);
       osc.stop(time + duration + 0.1);
-    } catch (e) {
-      console.error("Audio Error:", e);
-    }
+    } catch (e) { console.error("Audio Error:", e); }
   }
 
   playKick(time, style) {
@@ -389,7 +256,6 @@ class DJAudioEngine {
       const gain = this.ctx.createGain();
       osc.connect(gain);
       gain.connect(this.ctx.destination);
-
       if (style === "techno") {
         osc.frequency.setValueAtTime(200, time);
         osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.3);
@@ -401,13 +267,11 @@ class DJAudioEngine {
         gain.gain.setValueAtTime(0.9, time);
         gain.gain.exponentialRampToValueAtTime(0.01, time + 0.4);
       } else {
-        // heavy
         osc.frequency.setValueAtTime(150, time);
         osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
         gain.gain.setValueAtTime(0.8, time);
         gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
       }
-
       osc.start(time);
       osc.stop(time + 0.5);
     } catch (e) {}
@@ -418,31 +282,21 @@ class DJAudioEngine {
     try {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
-
       if (style === "clap") {
         const bufferSize = this.ctx.sampleRate * 0.5;
-        const buffer = this.ctx.createBuffer(
-          1,
-          bufferSize,
-          this.ctx.sampleRate
-        );
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
         const noise = this.ctx.createBufferSource();
         noise.buffer = buffer;
-
         const filter = this.ctx.createBiquadFilter();
         filter.type = "bandpass";
         filter.frequency.value = 1500;
-
         noise.connect(filter);
         filter.connect(gain);
         gain.connect(this.ctx.destination);
-
         gain.gain.setValueAtTime(0.5, time);
         gain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
-
         noise.start(time);
         noise.stop(time + 0.15);
       } else {
@@ -450,7 +304,6 @@ class DJAudioEngine {
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.frequency.setValueAtTime(200, time);
-
         if (style === "acoustic") {
           gain.gain.setValueAtTime(0.6, time);
           gain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
@@ -458,7 +311,6 @@ class DJAudioEngine {
           gain.gain.setValueAtTime(0.4, time);
           gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
         }
-
         osc.start(time);
         osc.stop(time + 0.2);
       }
@@ -470,25 +322,20 @@ class DJAudioEngine {
     try {
       const gain = this.ctx.createGain();
       const ratio = style === "open" ? 0.3 : 0.05;
-
       const bufferSize = this.ctx.sampleRate * 0.5;
       const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
       const noise = this.ctx.createBufferSource();
       noise.buffer = buffer;
-
       const filter = this.ctx.createBiquadFilter();
       filter.type = "highpass";
       filter.frequency.value = 8000;
-
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(this.ctx.destination);
-
       gain.gain.setValueAtTime(0.2, time);
       gain.gain.exponentialRampToValueAtTime(0.01, time + ratio);
-
       noise.start(time);
       noise.stop(time + ratio);
     } catch (e) {}
@@ -504,10 +351,8 @@ class DJAudioEngine {
       osc.frequency.setValueAtTime(freq, time);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
-
       gain.gain.setValueAtTime(0.4, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-
       osc.start(time);
       osc.stop(time + duration);
     } catch (e) {}
@@ -518,7 +363,6 @@ class DJAudioEngine {
     try {
       const rootFreq = this.notes[rootNote];
       const fifthFreq = rootFreq * 1.5;
-
       [rootFreq, fifthFreq].forEach((f) => {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
@@ -527,10 +371,8 @@ class DJAudioEngine {
         osc.frequency.setValueAtTime(f, time);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
-
         gain.gain.setValueAtTime(0.1, time);
         gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
-
         osc.start(time);
         osc.stop(time + 0.25);
       });
@@ -540,7 +382,7 @@ class DJAudioEngine {
   playPad(time) {
     if (!this.ctx) return;
     try {
-      const freqs = [349.23, 440.0, 523.25]; // F4, A4, C5 (F Major)
+      const freqs = [349.23, 440.0, 523.25]; 
       freqs.forEach((f) => {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
@@ -549,8 +391,6 @@ class DJAudioEngine {
         osc.frequency.setValueAtTime(f, time);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
-
-        // 音量を少し上げる (0.1 -> 0.15)
         gain.gain.setValueAtTime(0, time);
         gain.gain.linearRampToValueAtTime(0.15, time + 1);
         gain.gain.linearRampToValueAtTime(0, time + 4);
@@ -580,6 +420,56 @@ export default function LastTrainDJ() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentStyle, setCurrentStyle] = useState("hiphop");
 
+  // --- NoSleep Logic ---
+  const videoRef = useRef(null);
+  const [wakeLock, setWakeLock] = useState(null);
+  const [isWakeLockActive, setIsWakeLockActive] = useState(false);
+
+  // Wake Lockを有効にする関数（API + ビデオハック）
+  const enableNoSleep = useCallback(async () => {
+    // 1. 公式 API (Chrome/Android)
+    if ('wakeLock' in navigator) {
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        setWakeLock(lock);
+        setIsWakeLockActive(true);
+        lock.addEventListener('release', () => {
+          setIsWakeLockActive(false);
+          console.log('Wake Lock released');
+        });
+        console.log('Wake Lock active');
+      } catch (err) {
+        console.error(`${err.name}, ${err.message}`);
+      }
+    }
+
+    // 2. iOS用 Video Hack (隠し動画を再生)
+    if (videoRef.current) {
+      videoRef.current.play().catch(e => console.log("Video hack failed", e));
+      setIsWakeLockActive(true); // ビデオが再生できれば擬似的にActiveとする
+    }
+  }, []);
+
+  // ページが見えなくなった時にWake Lockが外れるので、戻ってきたら再取得
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && inRoom) {
+        // 再取得を試みる
+        await enableNoSleep();
+        
+        // オーディオコンテキストの復帰
+        if (audioEngine.ctx && audioEngine.ctx.state === "suspended") {
+          audioEngine.ctx.resume();
+        }
+        audioEngine.nextNoteTime = audioEngine.ctx ? audioEngine.ctx.currentTime + 0.1 : 0;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [inRoom, enableNoSleep]);
+
+
   // --- Auth & Init ---
   useEffect(() => {
     const initAuth = async () => {
@@ -598,36 +488,14 @@ export default function LastTrainDJ() {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-      // Sync UI style display with Audio Engine
       if (audioEngine.isPlaying && audioEngine.mode === "party") {
         if (currentStyle !== audioEngine.currentStyle) {
           setCurrentStyle(audioEngine.currentStyle);
         }
       }
-    }, 500); // Check every 500ms
+    }, 500); 
     return () => clearInterval(timer);
   }, [currentStyle]);
-
-  // --- Listen for visibility change (App Switcher/Lock Screen fix) ---
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        // App returned to foreground
-        if (audioEngine.ctx && audioEngine.ctx.state === "suspended") {
-          audioEngine.ctx.resume();
-        }
-        // Force resync time if needed
-        audioEngine.nextNoteTime = audioEngine.ctx
-          ? audioEngine.ctx.currentTime + 0.1
-          : 0;
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
 
   // --- Room Listener ---
   useEffect(() => {
@@ -667,7 +535,8 @@ export default function LastTrainDJ() {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          // Here we could sync Play state if we wanted stricter control
+          // リモートで再生状態が変わった場合の同期ロジックが必要ならここに追加
+          // ただし、NoSleepは「ユーザーアクション」が必要なため、自動再生だと効かないことがあります
         }
       },
       (err) => console.error("Error fetching room:", err)
@@ -725,6 +594,10 @@ export default function LastTrainDJ() {
   const joinRoom = async () => {
     if (!roomId) return;
     setInRoom(true);
+    
+    // 入室時にスリープ防止を有効化を試みる
+    await enableNoSleep();
+
     const userRef = doc(
       db,
       "artifacts",
@@ -742,6 +615,11 @@ export default function LastTrainDJ() {
   };
 
   const toggleDj = async () => {
+    // DJ開始時にもスリープ防止を確実に有効化
+    if (!isDjPlaying) {
+        await enableNoSleep();
+    }
+
     const newStatus = !isDjPlaying;
     setIsDjPlaying(newStatus);
     const roomRef = doc(
@@ -800,8 +678,6 @@ export default function LastTrainDJ() {
             <h1 className="text-4xl font-extrabold tracking-tight">終電 DJ</h1>
             <p className="mt-2 text-slate-400">
               音楽が終電を教えてくれる。
-              <br />
-              もう「帰ります」と言わなくていい。
             </p>
           </div>
 
@@ -868,6 +744,14 @@ export default function LastTrainDJ() {
                 </div>
               </div>
             </div>
+            
+            <div className="bg-yellow-900/30 p-3 rounded-lg border border-yellow-700/50">
+               <p className="text-xs text-yellow-200 flex items-center">
+                 <Smartphone size={14} className="mr-2" />
+                 スマホのスリープ防止機能が有効になります。
+               </p>
+            </div>
+
             <button
               onClick={joinRoom}
               disabled={!roomId || !myProfile.name}
@@ -877,25 +761,26 @@ export default function LastTrainDJ() {
             </button>
           </div>
         </div>
+        
+        {/* Hidden Video for NoSleep Hack (Initial Load) */}
+        <video
+          ref={videoRef}
+          src={MP4_TINY_BASE64}
+          playsInline
+          muted
+          loop
+          style={{ position: "absolute", width: 1, height: 1, opacity: 0.01, pointerEvents: 'none' }}
+        />
       </div>
     );
   }
 
   const isCritical = !!leavingUser;
 
-  // Style config for visual
   const styleConfig = {
-    hiphop: {
-      label: "HIP-HOP",
-      color: "from-purple-500 to-pink-500",
-      icon: Speaker,
-    },
+    hiphop: { label: "HIP-HOP", color: "from-purple-500 to-pink-500", icon: Speaker },
     rock: { label: "ROCK", color: "from-red-500 to-orange-500", icon: Zap },
-    techno: {
-      label: "TECHNO",
-      color: "from-blue-500 to-cyan-500",
-      icon: Radio,
-    },
+    techno: { label: "TECHNO", color: "from-blue-500 to-cyan-500", icon: Radio },
   };
 
   const currentVisual = isCritical
@@ -908,19 +793,30 @@ export default function LastTrainDJ() {
         isCritical ? "bg-red-950" : "bg-slate-900"
       }`}
     >
+      {/* Hidden Video for NoSleep Hack (In Room) */}
+      <video
+        ref={videoRef}
+        src={MP4_TINY_BASE64}
+        playsInline
+        muted
+        loop
+        style={{ position: "absolute", width: 1, height: 1, opacity: 0.01, pointerEvents: 'none', top: 0, left: 0 }}
+      />
+
       {/* Header */}
       <header className="p-4 flex justify-between items-center bg-black/20 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex items-center text-white">
           <Disc className={`mr-2 ${isDjPlaying ? "animate-spin" : ""}`} />
-          <span className="font-bold">Room: {roomId}</span>
+          <span className="font-bold text-sm md:text-base">Room: {roomId}</span>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-mono text-white font-bold leading-none">
-            {currentTime.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </div>
+        <div className="flex items-center gap-3">
+             <div className="flex items-center px-2 py-1 rounded bg-black/40 text-xs text-slate-400">
+                {isWakeLockActive ? <Unlock size={12} className="mr-1 text-green-400" /> : <Lock size={12} className="mr-1 text-red-400" />}
+                {isWakeLockActive ? "NoSleep ON" : "NoSleep OFF"}
+             </div>
+            <div className="text-2xl font-mono text-white font-bold leading-none">
+                {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </div>
         </div>
       </header>
 
@@ -946,12 +842,10 @@ export default function LastTrainDJ() {
           `}
           >
             <div className="w-56 h-56 rounded-full bg-slate-800 flex items-center justify-center relative overflow-hidden">
-              {/* Vinyl grooves */}
               <div className="absolute inset-0 border-4 border-slate-700 rounded-full opacity-50"></div>
               <div className="absolute inset-4 border-4 border-slate-700 rounded-full opacity-50"></div>
               <div className="absolute inset-8 border-4 border-slate-700 rounded-full opacity-50"></div>
 
-              {/* Label */}
               <div
                 className={`w-20 h-20 rounded-full flex items-center justify-center text-center text-xs font-bold text-white transition-all duration-500 bg-gradient-to-tr ${currentVisual.color}`}
               >
@@ -964,7 +858,6 @@ export default function LastTrainDJ() {
             </div>
           </div>
 
-          {/* Tone Arm */}
           <div
             className={`absolute top-0 right-0 w-4 h-32 bg-slate-400 origin-top transition-transform duration-700 ease-out -z-10 rounded-full shadow-lg
              ${isDjPlaying ? "rotate-[30deg]" : "rotate-[-10deg]"}
@@ -973,7 +866,7 @@ export default function LastTrainDJ() {
         </div>
 
         {/* Status Text */}
-        <div className="text-center z-10 mb-8 h-24">
+        <div className="text-center z-10 mb-8 h-24 w-full flex justify-center items-center">
           {!isDjPlaying ? (
             <button
               onClick={toggleDj}
@@ -1007,7 +900,7 @@ export default function LastTrainDJ() {
 
         {/* Leaving User Alert Overlay */}
         {isCritical && leavingUser && (
-          <div className="w-full max-w-md bg-red-900/90 border-2 border-red-500 rounded-xl p-6 text-center text-white shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="w-full max-w-md bg-red-900/90 border-2 border-red-500 rounded-xl p-6 text-center text-white shadow-2xl animate-in fade-in zoom-in duration-300 z-50 fixed md:static top-1/2 left-1/2 md:translate-x-0 md:translate-y-0 -translate-x-1/2 -translate-y-1/2">
             <Zap className="w-12 h-12 mx-auto mb-2 text-yellow-400 animate-pulse" />
             <p className="text-lg opacity-80">Final call for</p>
             <h3 className="text-3xl font-bold mb-2">{leavingUser.name}</h3>
